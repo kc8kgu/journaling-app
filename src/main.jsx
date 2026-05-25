@@ -1,29 +1,36 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
-import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { Box, CircularProgress, CssBaseline, ThemeProvider } from '@mui/material';
 import { ThemeContextProvider, useTheme } from './ThemeContext';
-import ListView from './pages/ListView';
-import ReadView from './pages/ReadView';
-import WriteEditView from './pages/WriteEditView';
+
+const ListView = lazy(() => import('./pages/ListView'));
+const ReadView = lazy(() => import('./pages/ReadView'));
+const WriteEditView = lazy(() => import('./pages/WriteEditView'));
+
+function RouteFallback() {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
+      <CircularProgress />
+    </Box>
+  );
+}
 
 function AppContent() {
   const { theme } = useTheme();
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <HashRouter>
+      <HashRouter>
+        <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<ListView />} />
             <Route path="/entry/new" element={<WriteEditView />} />
             <Route path="/entry/:id" element={<ReadView />} />
             <Route path="/entry/:id/edit" element={<WriteEditView />} />
           </Routes>
-        </HashRouter>
-      </LocalizationProvider>
+        </Suspense>
+      </HashRouter>
     </ThemeProvider>
   );
 }

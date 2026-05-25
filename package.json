@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "journaling-app",
   "private": true,
   "version": "0.0.0",
@@ -26,6 +26,7 @@
     "@types/react": "^19.1.4",
     "@types/react-dom": "^19.1.4",
     "@vitejs/plugin-react": "^4.5.1",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }
