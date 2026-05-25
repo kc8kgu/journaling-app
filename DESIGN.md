@@ -101,18 +101,18 @@ The main screen and entry point of the app.
 **Layout (top to bottom):**
 
 - App bar: app name/logo, overflow menu (⋮) with Export CSV and Import CSV actions  
-- **Featured card** — the most recent entry displayed prominently:  
+- **Featured card** — the newest journal entry displayed prominently. Entries are sorted by `date` descending, with `updatedAt` descending as the tie-breaker:  
   - Full date (e.g. "Friday, May 22, 2026")  
   - Mood emoji \+ label  
   - Entry text, truncated at 300 characters with ellipsis (tap card to read in full)  
   - Tag pills for all tags  
   - Tap anywhere on the card → Read View  
-- **History list** — all remaining entries, newest first:  
+- **History list** — all remaining entries, newest first using the same `date` descending, then `updatedAt` descending sort:  
   - Each row: date, mood emoji, 120-character text preview (ellipsis truncated), tag pills  
   - Tap anywhere on a row → Read View  
-- **FAB** (Floating Action Button) — bottom-right corner, `+` icon → New Entry (`/entry/write`)
+- **FAB** (Floating Action Button) — bottom-right corner, `+` icon → New Entry (`/entry/new`)
 
-**Empty state:** If no entries exist, show a centered prompt: "No entries yet — tap \+ to write your first."
+**Empty state:** If no entries exist, show a centered prompt, a visible "Write first entry" button that navigates to `/entry/new`, and a short privacy note: "Your journal is stored only on this device. Export a CSV backup anytime."
 
 ---
 
@@ -122,15 +122,16 @@ Displays a single entry in full, read-only.
 
 **Layout:**
 
-- App bar: back arrow (← returns to List View), "Edit" button (top-right) → Edit View  
+- App bar: back arrow (← returns to List View), "Edit" button (top-right) → Edit View, and an overflow menu with "Delete"  
 - Full date  
 - Mood emoji \+ label  
 - Full entry text (preserves line breaks)  
 - Tag pills for all tags
+- Delete action opens a confirmation dialog before removing the entry and returning to List View
 
 ---
 
-### 3\. Write View (`/entry/write`) and Edit View (`/entry/:id/edit`)
+### 3\. Write View (`/entry/new`) and Edit View (`/entry/:id/edit`)
 
 Shared component for creating and editing entries. Write View initializes with defaults; Edit View pre-fills from the existing entry.
 
@@ -150,7 +151,7 @@ Shared component for creating and editing entries. Write View initializes with d
 
 /#/                       → List View
 
-/#/entry/write            → Write View (new entry)
+/#/entry/new              → Write View (new entry)
 
 /#/entry/:id              → Read View
 
@@ -186,11 +187,12 @@ id,date,text,mood,tags,createdAt,updatedAt
 2. A file picker opens (`.csv` files only)  
 3. File is parsed via PapaParse  
 4. Each row is validated (required fields: `id`, `date`, `text`, `mood`). If `mood` is present but not one of the 6 valid keys, it is coerced to `neutral` rather than skipping the row.  
-5. Tags are taken from the CSV `tags` column as-is (pipe-separated). The CSV value is trusted over re-deriving from text, allowing manually curated tags.  
-   Timestamps (`createdAt`, `updatedAt`) are also taken from the CSV as-is, preserving original history on restore.  
-6. **Upsert logic:** if an entry with the same `id` already exists in IndexedDB, it is replaced. New `id`s are inserted.  
-7. On completion: show a snackbar with count of records imported/updated  
-8. On parse error: show an error snackbar with a brief description
+5. Tags are re-derived from each row's `text` using `extractTags()`; the CSV `tags` column is ignored so imported data follows the same derived-tag rule as saved entries.  
+   Timestamps (`createdAt`, `updatedAt`) are taken from the CSV as-is when valid, preserving original history on restore.  
+6. Before writing records, show a confirmation dialog summarizing the import count and warning: "Entries with matching IDs will be replaced."  
+7. **Upsert logic:** if an entry with the same `id` already exists in IndexedDB, it is replaced. New `id`s are inserted.  
+8. On completion: show a snackbar with count of records imported/updated  
+9. On parse error: show an error snackbar with a brief description
 
 ---
 
@@ -243,6 +245,8 @@ src/
 - **IndexedDB unavailable** (e.g. private browsing on some browsers): show a persistent banner warning that data will not be saved.  
 - **Import parse error**: snackbar with message, no data written.  
 - **Import validation error** (missing required fields): skip invalid rows, import valid ones, report skipped count in snackbar.  
+- **Import confirmation**: no data is written until the user confirms the parsed import summary.  
+- **Delete confirmation**: entry deletion requires confirmation before data is removed.  
 - **Empty save attempt**: inline validation — text area shows error state if empty on Save.
 
 ---

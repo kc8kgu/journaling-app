@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { getAllEntries, upsertEntries } from '../db';
+import { extractTags } from './tagParser';
 
 const VALID_MOODS = new Set(['happy', 'calm', 'neutral', 'sad', 'frustrated', 'anxious']);
 const COLUMNS = ['id', 'date', 'text', 'mood', 'tags', 'createdAt', 'updatedAt'];
@@ -31,7 +32,11 @@ export function parseCSV(file) {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: ({ data }) => {
+      complete: ({ data, errors }) => {
+        if (errors?.length) {
+          reject(errors[0]);
+          return;
+        }
         const valid = [];
         let skipped = 0;
         for (const row of data) {
@@ -40,13 +45,12 @@ export function parseCSV(file) {
             continue;
           }
           const mood = VALID_MOODS.has(row.mood) ? row.mood : 'neutral';
-          const tags = row.tags ? row.tags.split('|').filter(Boolean) : [];
           valid.push({
             id: row.id,
             date: row.date,
             text: row.text,
             mood,
-            tags,
+            tags: extractTags(row.text),
             createdAt: Number(row.createdAt) || Date.now(),
             updatedAt: Number(row.updatedAt) || Date.now(),
           });
@@ -58,8 +62,7 @@ export function parseCSV(file) {
   });
 }
 
-export async function importCSV(file) {
-  const { entries, skipped } = await parseCSV(file);
+export async function importCSV(entries) {
   await upsertEntries(entries);
-  return { imported: entries.length, skipped };
+  return { imported: entries.length };
 }

@@ -1,17 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   AppBar, Toolbar, Typography, IconButton, Menu, MenuItem,
-  Box, List, Fab, Snackbar, Alert, CircularProgress,
+  Box, List, Fab, Snackbar, Alert, CircularProgress, Button,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AddIcon from '@mui/icons-material/Add';
 import { useNavigate } from 'react-router-dom';
 import { getAllEntries } from '../db';
-import { triggerExport, importCSV } from '../utils/csvHelpers';
+import { triggerExport, parseCSV, importCSV } from '../utils/csvHelpers';
 import { seedDummyData } from '../utils/seedData';
+import { sortEntriesByJournalDate } from '../utils/entrySort';
 import ThemeToggle from '../components/ThemeToggle';
 import EntryCard from '../components/EntryCard';
 import EntryRow from '../components/EntryRow';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function ListView() {
   const navigate = useNavigate();
@@ -19,11 +21,12 @@ export default function ListView() {
   const [loading, setLoading] = useState(true);
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [snackbar, setSnackbar] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     getAllEntries()
-      .then((all) => setEntries([...all].sort((a, b) => b.createdAt - a.createdAt)))
+      .then((all) => setEntries(sortEntriesByJournalDate(all)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -44,7 +47,7 @@ export default function ListView() {
     handleMenuClose();
     await seedDummyData();
     const all = await getAllEntries();
-    setEntries([...all].sort((a, b) => b.createdAt - a.createdAt));
+    setEntries(sortEntriesByJournalDate(all));
     setSnackbar({ severity: 'success', message: 'Test data seeded.' });
   }
 
@@ -53,16 +56,32 @@ export default function ListView() {
     if (!file) return;
     e.target.value = '';
     try {
-      const { imported, skipped } = await importCSV(file);
-      const all = await getAllEntries();
-      setEntries([...all].sort((a, b) => b.createdAt - a.createdAt));
-      const msg = skipped > 0
-        ? `Imported ${imported} entries, skipped ${skipped} invalid rows.`
-        : `Imported ${imported} entries.`;
-      setSnackbar({ severity: 'success', message: msg });
+      const parsed = await parseCSV(file);
+      setPendingImport(parsed);
     } catch {
       setSnackbar({ severity: 'error', message: 'Failed to parse CSV.' });
     }
+  }
+
+  async function handleConfirmImport() {
+    if (!pendingImport) return;
+    try {
+      const { imported } = await importCSV(pendingImport.entries);
+      const all = await getAllEntries();
+      setEntries(sortEntriesByJournalDate(all));
+      const msg = pendingImport.skipped > 0
+        ? `Imported ${imported} entries, skipped ${pendingImport.skipped} invalid rows.`
+        : `Imported ${imported} entries.`;
+      setSnackbar({ severity: 'success', message: msg });
+    } catch {
+      setSnackbar({ severity: 'error', message: 'Import failed.' });
+    } finally {
+      setPendingImport(null);
+    }
+  }
+
+  function handleCancelImport() {
+    setPendingImport(null);
   }
 
   const [featured, ...rest] = entries;
@@ -104,9 +123,25 @@ export default function ListView() {
         )}
 
         {!loading && entries.length === 0 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 12 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 2,
+              mt: 12,
+              textAlign: 'center',
+            }}
+          >
             <Typography color="text.secondary">
-              No entries yet — tap + to write your first.
+              No entries yet.
+            </Typography>
+            <Button variant="contained" onClick={() => navigate('/entry/new')}>
+              Write first entry
+            </Button>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 320 }}>
+              Your journal is stored only on this device. Export a CSV backup anytime.
             </Typography>
           </Box>
         )}
@@ -145,6 +180,19 @@ export default function ListView() {
           {snackbar?.message}
         </Alert>
       </Snackbar>
+
+      <ConfirmDialog
+        open={Boolean(pendingImport)}
+        title={`Import ${pendingImport?.entries.length ?? 0} entries?`}
+        message={
+          pendingImport?.skipped > 0
+            ? `Entries with matching IDs will be replaced. ${pendingImport.skipped} invalid rows will be skipped.`
+            : 'Entries with matching IDs will be replaced.'
+        }
+        confirmLabel="Import"
+        onConfirm={handleConfirmImport}
+        onCancel={handleCancelImport}
+      />
     </Box>
   );
 }
