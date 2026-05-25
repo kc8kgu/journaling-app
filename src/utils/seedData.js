@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { upsertEntries } from '../db';
+import { deleteEntry, getAllEntries, upsertEntries } from '../db';
 
 const entries = [
   {
@@ -54,4 +54,23 @@ export async function seedDummyData() {
     };
   });
   await upsertEntries(seeded);
+}
+
+function isSeedEntry(entry) {
+  return entries.some((seed) => (
+    entry.date === seed.date
+    && entry.mood === seed.mood
+    && entry.text === seed.text
+  ));
+}
+
+export function countSeedEntries(allEntries) {
+  return allEntries.filter(isSeedEntry).length;
+}
+
+export async function clearDummyData() {
+  const allEntries = await getAllEntries();
+  const seeded = allEntries.filter(isSeedEntry);
+  await Promise.all(seeded.map((entry) => deleteEntry(entry.id)));
+  return seeded.length;
 }

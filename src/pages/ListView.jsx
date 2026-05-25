@@ -8,7 +8,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { useNavigate } from 'react-router-dom';
 import { getAllEntries } from '../db';
 import { triggerExport, parseCSV, importCSV } from '../utils/csvHelpers';
-import { seedDummyData } from '../utils/seedData';
+import { clearDummyData, countSeedEntries, seedDummyData } from '../utils/seedData';
 import { sortEntriesByJournalDate } from '../utils/entrySort';
 import ThemeToggle from '../components/ThemeToggle';
 import EntryCard from '../components/EntryCard';
@@ -22,6 +22,7 @@ export default function ListView() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [snackbar, setSnackbar] = useState(null);
   const [pendingImport, setPendingImport] = useState(null);
+  const [pendingClearCount, setPendingClearCount] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -49,6 +50,16 @@ export default function ListView() {
     const all = await getAllEntries();
     setEntries(sortEntriesByJournalDate(all));
     setSnackbar({ severity: 'success', message: 'Test data seeded.' });
+  }
+
+  function handleClearTestDataClick() {
+    handleMenuClose();
+    const count = countSeedEntries(entries);
+    if (count === 0) {
+      setSnackbar({ severity: 'info', message: 'No test data found.' });
+      return;
+    }
+    setPendingClearCount(count);
   }
 
   async function handleFileChange(e) {
@@ -84,6 +95,26 @@ export default function ListView() {
     setPendingImport(null);
   }
 
+  async function handleConfirmClearTestData() {
+    try {
+      const cleared = await clearDummyData();
+      const all = await getAllEntries();
+      setEntries(sortEntriesByJournalDate(all));
+      setSnackbar({
+        severity: 'success',
+        message: cleared === 1 ? 'Cleared 1 test entry.' : `Cleared ${cleared} test entries.`,
+      });
+    } catch {
+      setSnackbar({ severity: 'error', message: 'Failed to clear test data.' });
+    } finally {
+      setPendingClearCount(null);
+    }
+  }
+
+  function handleCancelClearTestData() {
+    setPendingClearCount(null);
+  }
+
   const [featured, ...rest] = entries;
 
   return (
@@ -101,7 +132,10 @@ export default function ListView() {
             <MenuItem onClick={handleExport}>Export CSV</MenuItem>
             <MenuItem onClick={handleImportClick}>Import CSV</MenuItem>
             {import.meta.env.DEV && (
-              <MenuItem onClick={handleSeed}>Seed test data</MenuItem>
+              <>
+                <MenuItem onClick={handleSeed}>Seed test data</MenuItem>
+                <MenuItem onClick={handleClearTestDataClick}>Clear test data</MenuItem>
+              </>
             )}
           </Menu>
         </Toolbar>
@@ -192,6 +226,18 @@ export default function ListView() {
         confirmLabel="Import"
         onConfirm={handleConfirmImport}
         onCancel={handleCancelImport}
+      />
+
+      <ConfirmDialog
+        open={pendingClearCount !== null}
+        title="Clear test data?"
+        message={`This will delete ${pendingClearCount ?? 0} seeded test ${
+          pendingClearCount === 1 ? 'entry' : 'entries'
+        }. Your other journal entries will stay untouched.`}
+        confirmLabel="Clear"
+        confirmColor="error"
+        onConfirm={handleConfirmClearTestData}
+        onCancel={handleCancelClearTestData}
       />
     </Box>
   );
