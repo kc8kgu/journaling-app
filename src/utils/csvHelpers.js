@@ -1,8 +1,8 @@
 import Papa from 'papaparse';
 import { getAllEntries, upsertEntries } from '../db';
 import { extractTags } from './tagParser';
+import { coerceMood } from './moods';
 
-const VALID_MOODS = new Set(['happy', 'calm', 'neutral', 'sad', 'frustrated', 'anxious']);
 const COLUMNS = ['id', 'date', 'text', 'mood', 'tags', 'createdAt', 'updatedAt'];
 
 export function exportCSV(entries) {
@@ -44,12 +44,11 @@ export function parseCSV(file) {
             skipped++;
             continue;
           }
-          const mood = VALID_MOODS.has(row.mood) ? row.mood : 'neutral';
           valid.push({
             id: row.id,
             date: row.date,
             text: row.text,
-            mood,
+            mood: coerceMood(row.mood),
             tags: extractTags(row.text),
             createdAt: Number(row.createdAt) || Date.now(),
             updatedAt: Number(row.updatedAt) || Date.now(),
