@@ -18,7 +18,7 @@ This is a mobile-first React 19 journaling app. All data lives in the browser �
 
 ### Data flow
 
-`src/db.js` is the single source of truth for persistence. It opens an IndexedDB database (`journal-db`, object store `entries`, key path `id`) via the `idb` wrapper and exports async helpers (`getAllEntries`, `getEntry`, `saveEntry`, `deleteEntry`, `upsertEntries`). All page components call these directly — there is no state management layer.
+`src/db.js` is the single source of truth for persistence. It opens an IndexedDB database (`journal-db`, object store `entries`, key path `id`) via the `idb` wrapper and exports async helpers (`getAllEntries`, `getEntry`, `saveEntry`, `deleteEntry`, `upsertEntries`, `checkDBAvailable`). All page components call these directly — there is no state management layer.
 
 ### Entry shape
 
@@ -36,7 +36,13 @@ This is a mobile-first React 19 journaling app. All data lives in the browser �
 
 Mood defaults to `neutral` on new entries. Tags are always derived by `extractTags()` from `src/utils/tagParser.js` on every save — they are never manually edited.
 
-List views sort entries as a journal timeline: `date` descending first, then `updatedAt` descending as the tie-breaker.
+List views sort entries with `sortEntriesByJournalDate()` from `src/utils/entrySort.js`: `date` descending first, then `updatedAt` descending as the tie-breaker.
+
+### App bootstrapping
+
+`src/main.jsx` wraps the app in `ThemeContextProvider`, uses `useTheme()` to choose the active MUI theme, checks IndexedDB availability with `checkDBAvailable()`, wires `CssBaseline`, `LocalizationProvider` (dayjs adapter), `HashRouter`, and lazy-loads route components under `Suspense`.
+
+`src/theme.js` exports both `lightTheme` and `darkTheme`. `src/ThemeContext.jsx` persists the selected mode in `localStorage` under `theme-mode`.
 
 ### Routing
 
@@ -53,18 +59,22 @@ List views sort entries as a journal timeline: `date` descending first, then `up
 
 ### Key files
 
-- `src/main.jsx` — app entry; wires `ThemeProvider`, `CssBaseline`, `LocalizationProvider` (dayjs adapter), `HashRouter`, and routes
-- `src/theme.js` — MUI v5 dark theme; extend here for any global style overrides
+- `src/main.jsx` — app entry; wires theme context, storage availability warning, `LocalizationProvider`, `HashRouter`, and lazy routes
+- `src/theme.js` — MUI v5 light/dark themes; extend here for any global style overrides
+- `src/ThemeContext.jsx` — theme mode state, persistence, and active theme selection
 - `src/db.js` — all IndexedDB access; bump `DB_VERSION` and add an `upgrade()` branch if the schema changes
 - `src/utils/tagParser.js` — `extractTags(text)` regex; returns lowercased unique tags
-- `src/utils/csvHelpers.js` — `triggerExport()` and `importCSV(file)`; tags are pipe-separated on export (`productive|grateful`), but import must re-derive tags from `text` via `extractTags()`
+- `src/utils/moods.js` — mood metadata, validation, and coercion to `neutral`
+- `src/utils/entrySort.js` — journal timeline sorting
+- `src/utils/csvHelpers.js` — `triggerExport()`, `parseCSV(file)`, and `importCSV(entries)`; tags are pipe-separated on export (`productive|grateful`), but import must re-derive tags from `text` via `extractTags()`
+- `src/utils/seedData.js` — dev-only sample data helpers used by `ListView`
 
 ### UI conventions
 
-- MUI v5 components throughout; dark theme applied globally via `ThemeProvider` in `main.jsx`
+- MUI v5 components throughout; light/dark theme applied globally via `ThemeProvider` in `main.jsx`
 - Date handling uses `dayjs` (the MUI date picker adapter); keep date strings in ISO 8601 (`YYYY-MM-DD`)
 - Mood is always one of the 6 fixed keys — never a free-form string. Invalid moods are coerced to `neutral` on CSV import.
-- CSV import must show a confirmation summary before writing records. Upsert behavior replaces entries with matching `id`s only after confirmation.
+- CSV import is two-step: `parseCSV(file)` validates/parses and returns `{ entries, skipped }`, then the UI shows a confirmation summary before `importCSV(entries)` writes records. Upsert behavior replaces entries with matching `id`s only after confirmation.
 - Read View includes a delete action behind confirmation before removing an entry.
 - The empty List View state includes both a visible "Write first entry" button and a short local-only storage note.
-- Components planned per DESIGN.md: `MoodChip`, `MoodSelector`, `TagPills`, `EntryCard`, `EntryRow`, `ConfirmDialog` in `src/components/`
+- Existing shared components in `src/components/`: `MoodChip`, `MoodSelector`, `TagPills`, `EntryCard`, `EntryRow`, `ConfirmDialog`, `ThemeToggle`.
