@@ -46,3 +46,12 @@ export async function upsertEntries(entries) {
   const tx = db.transaction(STORE, 'readwrite');
   await Promise.all([...entries.map((e) => tx.store.put(e)), tx.done]);
 }
+
+export async function checkDBAvailable() {
+  try {
+    await getDB();
+    return true;
+  } catch {
+    return false;
+  }
+}

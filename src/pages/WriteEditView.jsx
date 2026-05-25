@@ -13,8 +13,6 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { getEntry, saveEntry } from '../db';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -149,97 +147,95 @@ export default function WriteEditView() {
   }
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <Box>
-        <AppBar position="sticky">
-          <Toolbar>
-            <IconButton color="inherit" edge="start" onClick={handleBack} aria-label="back">
-              <ArrowBackIcon />
-            </IconButton>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
-              {isEditMode ? 'Edit Entry' : 'New Entry'}
+    <Box>
+      <AppBar position="sticky">
+        <Toolbar>
+          <IconButton color="inherit" edge="start" onClick={handleBack} aria-label="back">
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            {isEditMode ? 'Edit Entry' : 'New Entry'}
+          </Typography>
+          {!notFound && (
+            <Button color="inherit" onClick={handleSave} disabled={loading || saving}>
+              Save
+            </Button>
+          )}
+        </Toolbar>
+      </AppBar>
+
+      <Box sx={{ p: 2 }}>
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {!loading && notFound && (
+          <Box sx={{ mt: 8, textAlign: 'center' }}>
+            <Typography variant="h6" gutterBottom>
+              Entry not found
             </Typography>
-            {!notFound && (
-              <Button color="inherit" onClick={handleSave} disabled={loading || saving}>
-                Save
-              </Button>
-            )}
-          </Toolbar>
-        </AppBar>
+            <Button variant="contained" onClick={() => navigate('/')}>
+              Back to journal
+            </Button>
+          </Box>
+        )}
 
-        <Box sx={{ p: 2 }}>
-          {loading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-              <CircularProgress />
-            </Box>
-          )}
+        {!loading && !notFound && (
+          <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <DatePicker
+              label="Date"
+              value={dayjs(form.date)}
+              onChange={(nextValue) => {
+                if (nextValue?.isValid()) {
+                  updateForm({ date: nextValue.format('YYYY-MM-DD') });
+                }
+              }}
+              slotProps={{ textField: { fullWidth: true } }}
+            />
 
-          {!loading && notFound && (
-            <Box sx={{ mt: 8, textAlign: 'center' }}>
-              <Typography variant="h6" gutterBottom>
-                Entry not found
+            <MoodSelector
+              value={form.mood}
+              onChange={(mood) => updateForm({ mood })}
+            />
+
+            <TextField
+              label="Entry"
+              placeholder="What's on your mind? Use #tags to categorize."
+              value={form.text}
+              onChange={(event) => {
+                updateForm({ text: event.target.value });
+                if (textError && event.target.value.trim().length > 0) {
+                  setTextError(false);
+                }
+              }}
+              multiline
+              minRows={10}
+              fullWidth
+              error={textError}
+              helperText={textError ? 'Write something before saving.' : ' '}
+            />
+
+            <Box>
+              <Typography variant="subtitle2" component="div" sx={{ mb: 1 }}>
+                Detected tags:
               </Typography>
-              <Button variant="contained" onClick={() => navigate('/')}>
-                Back to journal
-              </Button>
+              <TagPills tags={detectedTags} />
             </Box>
-          )}
-
-          {!loading && !notFound && (
-            <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <DatePicker
-                label="Date"
-                value={dayjs(form.date)}
-                onChange={(nextValue) => {
-                  if (nextValue?.isValid()) {
-                    updateForm({ date: nextValue.format('YYYY-MM-DD') });
-                  }
-                }}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-
-              <MoodSelector
-                value={form.mood}
-                onChange={(mood) => updateForm({ mood })}
-              />
-
-              <TextField
-                label="Entry"
-                placeholder="What's on your mind? Use #tags to categorize."
-                value={form.text}
-                onChange={(event) => {
-                  updateForm({ text: event.target.value });
-                  if (textError && event.target.value.trim().length > 0) {
-                    setTextError(false);
-                  }
-                }}
-                multiline
-                minRows={10}
-                fullWidth
-                error={textError}
-                helperText={textError ? 'Write something before saving.' : ' '}
-              />
-
-              <Box>
-                <Typography variant="subtitle2" component="div" sx={{ mb: 1 }}>
-                  Detected tags:
-                </Typography>
-                <TagPills tags={detectedTags} />
-              </Box>
-            </Box>
-          )}
-        </Box>
-
-        <ConfirmDialog
-          open={discardOpen}
-          title="Discard changes?"
-          message="Your unsaved changes will be lost."
-          confirmLabel="Discard"
-          confirmColor="error"
-          onConfirm={navigateAway}
-          onCancel={() => setDiscardOpen(false)}
-        />
+          </Box>
+        )}
       </Box>
-    </LocalizationProvider>
+
+      <ConfirmDialog
+        open={discardOpen}
+        title="Discard changes?"
+        message="Your unsaved changes will be lost."
+        confirmLabel="Discard"
+        confirmColor="error"
+        onConfirm={navigateAway}
+        onCancel={() => setDiscardOpen(false)}
+      />
+    </Box>
   );
 }
